@@ -1,0 +1,237 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "hashDonnees",
+				"type": "string"
+			}
+		],
+		"name": "creerLot",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "createur",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "LotCree",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "de",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "vers",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "etape",
+				"type": "string"
+			}
+		],
+		"name": "LotTransfere",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "destinataire",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "etape",
+				"type": "string"
+			}
+		],
+		"name": "transfererLot",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			}
+		],
+		"name": "getHistorique",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "expediteur",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "destinataire",
+						"type": "address"
+					},
+					{
+						"internalType": "string",
+						"name": "etape",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct ChainCacao.Transfert[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "historiques",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "expediteur",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "destinataire",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "etape",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			}
+		],
+		"name": "lotExiste",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "lots",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "lotId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "hashDonnees",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "createur",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "existe",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
