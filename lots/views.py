@@ -55,7 +55,7 @@ class LotListCreateView(APIView):
             # =========================
             # QR CODE LOT
             # =========================
-            verify_url = f"http://localhost:8000/api/lots/{lot.id}/verify/"
+            verify_url = f"https://mbh-chaincacao-back.onrender.com/api/lots/{lot.id}/verify/"
 
             qr_url = generer_qr_code(
                 verify_url,
