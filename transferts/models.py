@@ -1,3 +1,4 @@
+# transferts/models.py
 from django.db import models
 from lots.models import Lot
 from users.models import User

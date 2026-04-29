@@ -58,3 +58,15 @@ class ProfileView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# =========================
+# LISTE COOPERATIVES
+# =========================
+
+class CooperativeListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        users = User.objects.filter(role='cooperative')
+        return Response(UserSerializer(users, many=True).data)
+
