@@ -47,16 +47,8 @@ class LotListCreateView(APIView):
                 hash_donnees=lot.calculer_hash()
             )
 
-            # if tx_hash:
-            #     lot.tx_hash = tx_hash
-            #     lot.save()
-
-            if tx_hash:
-                lot.tx_hash = tx_hash
-                lot.blockchain_status = "confirmed"
-            else:
-                lot.blockchain_status = "pending"
-
+            lot.tx_hash = tx_hash if tx_hash else None
+            lot.blockchain_status = "confirmed" if tx_hash else "pending"
             lot.save()
 
             # =========================
@@ -69,12 +61,8 @@ class LotListCreateView(APIView):
                 public_id=f"qr_lot_{lot.id}"
             )
 
-            # IMPORTANT : champ correct
-            if hasattr(lot, "qr_code_url"):
-                lot.qr_code_url = qr_url
-            else:
-                lot.qr_code = qr_url
-
+            # ✅ UNIQUE SOURCE OF TRUTH
+            lot.qr_code_url = qr_url
             lot.save()
 
             return Response({
@@ -203,122 +191,3 @@ def generer_qr_code(url: str, public_id: str = None) -> str:
     )
 
     return upload_result["secure_url"]
-
-
-# =========================
-# SCANNER
-# =========================
-
-class ScannerLotView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, lot_id):
-        try:
-            lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        etapes_faites = [t.etape for t in lot.transferts.all()]
-
-        return Response({
-            'lot': LotSerializer(lot).data,
-            'historique_transferts': TransfertSerializer(lot.transferts.all(), many=True).data,
-        })
-
-
-# =========================
-# CONFIRM RECEPTION
-# =========================
-
-class ConfirmerReceptionView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, lot_id):
-        try:
-            lot = Lot.objects.get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        transfert = Transfert.objects.create(
-            lot=lot,
-            expediteur=lot.agriculteur,
-            destinataire=request.user,
-            etape="reception",
-            poids_verifie=request.data.get('poids_verifie', lot.poids_kg),
-            notes=request.data.get('notes', '')
-        )
-
-        blockchain = BlockchainService()
-        tx_hash = blockchain.enregistrer_transfert(
-            lot_id=str(lot.id),
-            etape="reception",
-            user_id=request.user.id
-        )
-
-        if tx_hash:
-            transfert.tx_hash = tx_hash
-            transfert.save()
-
-        return Response({
-            'transfert': TransfertSerializer(transfert).data,
-            'lot': LotSerializer(lot).data,
-            'message': '✅ Réception confirmée'
-        })
-
-
-# =========================
-# CERTIFICAT EUDR + CLOUDINARY
-# =========================
-
-class CertificatEUDRView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, lot_id):
-        try:
-            lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        blockchain = BlockchainService()
-
-        blockchain_data = {
-            'enregistre_sur_bc': blockchain.lot_existe_blockchain(str(lot.id)),
-            'tx_hash': lot.tx_hash or '',
-        }
-
-        pdf_bytes = generer_certificat_eudr(
-            lot,
-            lot.transferts.all(),
-            blockchain_data
-        )
-
-        file_obj = io.BytesIO(pdf_bytes)
-        file_obj.seek(0)
-
-        upload_result = cloudinary.uploader.upload(
-            file_obj,
-            resource_type="raw",
-            folder="certificats_eudr",
-            public_id=f"certificat_{lot.id}",
-            format="pdf"
-        )
-
-        certificat_url = upload_result["secure_url"]
-
-        qr_code = generer_qr_code(
-            certificat_url,
-            public_id=f"qr_certificat_{lot.id}"
-        )
-
-        if hasattr(lot, "certificat_url"):
-            lot.certificat_url = certificat_url
-            lot.qr_code_url = qr_code
-            lot.save()
-
-        return Response({
-            "lot": LotSerializer(lot).data,
-            "certificat_url": certificat_url,
-            "qr_code": qr_code,
-            "blockchain": blockchain_data,
-            "message": "✅ Certificat généré"
-        })

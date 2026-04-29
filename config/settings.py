@@ -1,3 +1,4 @@
+# config/settings.py
 import os  # <-- TRÈS IMPORTANT : Ne pas oublier cet import pour ALLOWED_HOSTS
 from pathlib import Path
 import dj_database_url

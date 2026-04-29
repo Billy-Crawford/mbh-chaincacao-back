@@ -1,3 +1,4 @@
+# lots/models.py
 import uuid
 import hashlib
 from django.db import models
@@ -21,17 +22,17 @@ class Lot(models.Model):
         ('exporte',    'Exporté'),
     ]
 
-    # ───────── IDENTIFIANT ─────────
+    # ID
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
-    # ───────── RELATION ─────────
+    # RELATION
     agriculteur = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
         related_name='lots'
     )
 
-    # ───────── DONNÉES MÉTIER ─────────
+    # DONNÉES MÉTIER
     espece = models.CharField(max_length=20, choices=ESPECES)
     poids_kg = models.FloatField()
     gps_latitude = models.FloatField()
@@ -41,34 +42,29 @@ class Lot(models.Model):
     notes = models.TextField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUTS, default='cree')
 
-    # ───────── BLOCKCHAIN ─────────
+    # BLOCKCHAIN
     tx_hash = models.CharField(max_length=100, blank=True)
     block_number = models.IntegerField(null=True, blank=True)
-
-    blockchain_status = models.CharField(
-        max_length=20,
-        default="pending"
-    )
+    blockchain_status = models.CharField(max_length=20, default="pending")
     retry_count = models.IntegerField(default=0)
 
-    # 🔥 hash du lot (audit / EUDR / anti-fake)
+    # HASH DATA
     data_hash = models.CharField(max_length=256, blank=True)
 
-    # ───────── CLOUDINARY ─────────
+    # CLOUDINARY / DOCUMENTS (🔥 FIX IMPORTANT)
     certificat_url = models.URLField(blank=True, null=True)
     qr_code_url = models.URLField(blank=True, null=True)
 
-    # ───────── TIMESTAMP ─────────
+    # TIMESTAMP
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # ───────── LOGIQUE HASH ─────────
+    # HASH LOGIC
     def calculer_hash(self):
         data = f"{self.id}{self.gps_latitude}{self.gps_longitude}{self.poids_kg}{self.date_recolte}{self.agriculteur_id}"
         return hashlib.sha256(data.encode()).hexdigest()
 
     def save(self, *args, **kwargs):
-        # auto-save hash (optionnel mais propre)
         if not self.data_hash:
             self.data_hash = self.calculer_hash()
         super().save(*args, **kwargs)
