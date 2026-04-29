@@ -191,3 +191,23 @@ def generer_qr_code(url: str, public_id: str = None) -> str:
     )
 
     return upload_result["secure_url"]
+
+# =========================
+# SCANNER
+# =========================
+
+class ScannerLotView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, lot_id):
+        try:
+            lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
+        except Lot.DoesNotExist:
+            return Response({'error': 'Lot introuvable'}, status=404)
+
+        etapes_faites = [t.etape for t in lot.transferts.all()]
+
+        return Response({
+            'lot': LotSerializer(lot).data,
+            'historique_transferts': TransfertSerializer(lot.transferts.all(), many=True).data,
+        })
