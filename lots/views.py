@@ -164,7 +164,7 @@ class ExporterLotView(APIView):
         return Response({
             'transfert': TransfertSerializer(transfert).data,
             'lot': LotSerializer(lot).data,
-            'certificat_eudr': f'http://localhost:8000/api/lots/{lot_id}/verify/',
+            'certificat_eudr': f'https://mbh-chaincacao-back.onrender.com/api/lots/{lot_id}/verify/',
             'message': '🚢 Lot exporté'
         })
 
