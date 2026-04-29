@@ -75,12 +75,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # BASE DE DONNÉES : Dynamique pour Render et Local
 # On utilise la DATABASE_URL fournie par Render (ou Neon), sinon SQLite en local
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=config('DATABASE_URL', default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
-        conn_max_age=600
+    "default": dj_database_url.parse(
+        "postgresql://neondb_owner:npg_2R3PkUIrgSoK@ep-twilight-feather-am2ctcmo-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
     )
 }
+
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=config('DATABASE_URL', default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
+#         conn_max_age=600
+#     )
+# }
 
 # Cloudinary
 import cloudinary
