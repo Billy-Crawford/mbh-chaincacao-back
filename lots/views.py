@@ -33,29 +33,40 @@ class LotListCreateView(APIView):
     def get(self, request):
         user = request.user
 
-        # Si c'est un agriculteur, il voit ses propres productions
-        if hasattr(user, 'role') and user.role == 'agriculteur':
-            lots = Lot.objects.filter(agriculteur=user).order_by('-created_at')
+        # =========================
+        # AGRICULTEUR
+        # =========================
+        if user.role == 'agriculteur':
+            lots = Lot.objects.filter(
+                agriculteur=user
+            ).order_by('-created_at')
 
-        # Si c'est une coopérative, elle doit voir les lots à réceptionner
-        # OU les lots déjà réceptionnés par elle
-        elif hasattr(user, 'role') and user.role == 'cooperative':
-            # Option A : La coop voit TOUS les lots créés qui n'ont pas encore de transfert vers une autre coop
-            lots = Lot.objects.all().order_by('-created_at')
+        # =========================
+        # COOPERATIVE (🔥 CORRECTION ICI)
+        # =========================
+        elif user.role == 'cooperative':
 
-        # Si c'est un exportateur
-        elif hasattr(user, 'role') and user.role == 'exportateur':
-            lots = Lot.objects.filter(statut='en_transit').order_by('-created_at')
+            # ✅ UNIQUEMENT les lots envoyés à elle
+            lots_ids = Transfert.objects.filter(
+                destinataire=user
+            ).values_list('lot_id', flat=True)
+
+            lots = Lot.objects.filter(
+                id__in=lots_ids
+            ).order_by('-created_at')
+
+        # =========================
+        # EXPORTATEUR
+        # =========================
+        elif user.role == 'exportateur':
+            lots = Lot.objects.filter(
+                statut='en_transit'
+            ).order_by('-created_at')
 
         else:
-            # Par défaut, on retourne les lots liés à l'utilisateur
-            lots = Lot.objects.filter(agriculteur=user).order_by('-created_at')
+            lots = Lot.objects.none()
 
         return Response(LotSerializer(lots, many=True).data)
-
-    # def get(self, request):
-    #     lots = Lot.objects.filter(agriculteur=request.user).order_by('-created_at')
-    #     return Response(LotSerializer(lots, many=True).data)
 
     def post(self, request):
         serializer = LotSerializer(data=request.data)
@@ -77,7 +88,7 @@ class LotListCreateView(APIView):
             lot.save()
 
             # =========================
-            # QR CODE LOT
+            # QR CODE
             # =========================
             verify_url = f"https://mbh-chaincacao-back.onrender.com/api/lots/{lot.id}/verify/"
 
@@ -86,7 +97,6 @@ class LotListCreateView(APIView):
                 public_id=f"qr_lot_{lot.id}"
             )
 
-            # ✅ UNIQUE SOURCE OF TRUTH
             lot.qr_code_url = qr_url
             lot.save()
 
@@ -94,15 +104,14 @@ class LotListCreateView(APIView):
                 'lot': LotSerializer(lot).data,
                 'qr_code_url': qr_url,
                 'tx_hash': tx_hash,
-                'message': '✅ Lot enregistré sur la blockchain !'
-                if tx_hash else '✅ Lot créé (blockchain en attente)'
+                'message': '✅ Lot créé'
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # =========================
-# LOT DETAIL
+# LOT DETAIL (sécurisé)
 # =========================
 
 class LotDetailView(APIView):
@@ -114,11 +123,27 @@ class LotDetailView(APIView):
         except Lot.DoesNotExist:
             return Response({'error': 'Lot introuvable'}, status=404)
 
+        user = request.user
+
+        # 🔒 AGRICULTEUR
+        if user.role == 'agriculteur' and lot.agriculteur != user:
+            return Response({'error': 'Accès refusé'}, status=403)
+
+        # 🔒 COOPERATIVE
+        if user.role == 'cooperative':
+            autorise = Transfert.objects.filter(
+                lot=lot,
+                destinataire=user
+            ).exists()
+
+            if not autorise:
+                return Response({'error': 'Accès refusé'}, status=403)
+
         return Response(LotSerializer(lot).data)
 
 
 # =========================
-# VERIFICATION LOT
+# VERIFICATION PUBLIQUE (QR)
 # =========================
 
 class VerifierLotView(APIView):
@@ -139,62 +164,12 @@ class VerifierLotView(APIView):
                 'tx_hash': lot.tx_hash or 'Non enregistré',
                 'enregistre_sur_bc': blockchain.lot_existe_blockchain(str(lot.id)),
                 'historique': blockchain.get_historique(str(lot.id)),
-                'verification': '✅ Vérifié sur la blockchain'
-                if blockchain.lot_existe_blockchain(str(lot.id)) else '⏳ En attente',
             },
-            'eudr_conforme': bool(lot.tx_hash)
         })
 
 
 # =========================
-# EXPORT LOT
-# =========================
-
-class ExporterLotView(APIView):
-    permission_classes = [EstExportateur]
-
-    def post(self, request, lot_id):
-        try:
-            lot = Lot.objects.get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        if lot.statut != 'en_transit':
-            return Response({'error': 'Statut invalide'}, status=400)
-
-        transfert = Transfert.objects.create(
-            lot=lot,
-            expediteur=request.user,
-            destinataire=request.user,
-            etape='exportateur_europe',
-            poids_verifie=request.data.get('poids_verifie', lot.poids_kg),
-            notes=request.data.get('notes', '')
-        )
-
-        blockchain = BlockchainService()
-        tx_hash = blockchain.enregistrer_transfert(
-            lot_id=str(lot.id),
-            etape='exportateur_europe',
-            user_id=request.user.id
-        )
-
-        if tx_hash:
-            transfert.tx_hash = tx_hash
-            transfert.save()
-
-        lot.statut = 'exporte'
-        lot.save()
-
-        return Response({
-            'transfert': TransfertSerializer(transfert).data,
-            'lot': LotSerializer(lot).data,
-            'certificat_eudr': f'https://mbh-chaincacao-back.onrender.com/api/lots/{lot_id}/verify/',
-            'message': '🚢 Lot exporté'
-        })
-
-
-# =========================
-# QR CODE FUNCTION
+# QR CODE
 # =========================
 
 def generer_qr_code(url: str, public_id: str = None) -> str:
@@ -216,119 +191,3 @@ def generer_qr_code(url: str, public_id: str = None) -> str:
     )
 
     return upload_result["secure_url"]
-
-# =========================
-# SCANNER
-# =========================
-
-class ScannerLotView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, lot_id):
-        try:
-            lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        etapes_faites = [t.etape for t in lot.transferts.all()]
-
-        return Response({
-            'lot': LotSerializer(lot).data,
-            'historique_transferts': TransfertSerializer(lot.transferts.all(), many=True).data,
-        })
-# =========================
-# CONFIRM RECEPTION
-# =========================
-
-class ConfirmerReceptionView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, lot_id):
-        try:
-            lot = Lot.objects.get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        transfert = Transfert.objects.create(
-            lot=lot,
-            expediteur=lot.agriculteur,
-            destinataire=request.user,
-            etape="reception",
-            poids_verifie=request.data.get('poids_verifie', lot.poids_kg),
-            notes=request.data.get('notes', '')
-        )
-
-        blockchain = BlockchainService()
-        tx_hash = blockchain.enregistrer_transfert(
-            lot_id=str(lot.id),
-            etape="reception",
-            user_id=request.user.id
-        )
-
-        if tx_hash:
-            transfert.tx_hash = tx_hash
-            transfert.save()
-
-        return Response({
-            'transfert': TransfertSerializer(transfert).data,
-            'lot': LotSerializer(lot).data,
-            'message': '✅ Réception confirmée'
-        })
-
-
-# =========================
-# CERTIFICAT EUDR + CLOUDINARY
-# =========================
-
-class CertificatEUDRView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, lot_id):
-        try:
-            lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
-
-        blockchain = BlockchainService()
-
-        blockchain_data = {
-            'enregistre_sur_bc': blockchain.lot_existe_blockchain(str(lot.id)),
-            'tx_hash': lot.tx_hash or '',
-        }
-
-        pdf_bytes = generer_certificat_eudr(
-            lot,
-            lot.transferts.all(),
-            blockchain_data
-        )
-
-        file_obj = io.BytesIO(pdf_bytes)
-        file_obj.seek(0)
-
-        upload_result = cloudinary.uploader.upload(
-            file_obj,
-            resource_type="raw",
-            folder="certificats_eudr",
-            public_id=f"certificat_{lot.id}",
-            format="pdf"
-        )
-
-        certificat_url = upload_result["secure_url"]
-
-        qr_code = generer_qr_code(
-            certificat_url,
-            public_id=f"qr_certificat_{lot.id}"
-        )
-
-        if hasattr(lot, "certificat_url"):
-            lot.certificat_url = certificat_url
-            lot.qr_code_url = qr_code
-            lot.save()
-
-        return Response({
-            "lot": LotSerializer(lot).data,
-            "certificat_url": certificat_url,
-            "qr_code": qr_code,
-            "blockchain": blockchain_data,
-            "message": "✅ Certificat généré"
-        })
