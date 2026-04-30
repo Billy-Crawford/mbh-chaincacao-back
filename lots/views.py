@@ -22,42 +22,33 @@ import cloudinary.uploader
 # LOT CREATE + LIST
 # =========================
 
+# lots/views.py
 class LotListCreateView(APIView):
     permission_classes = [IsAuthenticated]
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [EstAgriculteur()]
-        return [IsAuthenticated()]
 
     def get(self, request):
         user = request.user
 
-        # =========================
-        # AGRICULTEUR
-        # =========================
         if user.role == 'agriculteur':
             lots = Lot.objects.filter(agriculteur=user)
 
-        # =========================
-        # COOPERATIVE (UNIQUEMENT LOTS ATTRIBUÉS)
-        # =========================
         elif user.role == 'cooperative':
+            # 🔥 IMPORTANT : uniquement assignés MAIS NON certifiés
             lots = Lot.objects.filter(
-                transferts__destinataire=user
+                transferts__destinataire=user,
+                statut__in=["envoye", "en_attente_validation"]
             ).distinct()
 
-        # =========================
-        # TRANSFORMATEUR
-        # =========================
+        # elif user.role == 'cooperative':
+        #     lots = Lot.objects.filter(
+        #         transferts__destinataire=user
+        #     ).distinct()
+
         elif user.role == 'transformateur':
             lots = Lot.objects.filter(
                 transferts__destinataire=user
             ).distinct()
 
-        # =========================
-        # EXPORTATEUR
-        # =========================
         elif user.role == 'exportateur':
             lots = Lot.objects.filter(statut='en_transit')
 
@@ -66,53 +57,31 @@ class LotListCreateView(APIView):
 
         return Response(LotSerializer(lots, many=True).data)
 
-
-    # def get(self, request):
-    #     lots = Lot.objects.filter(agriculteur=request.user).order_by('-created_at')
-    #     return Response(LotSerializer(lots, many=True).data)
-
     def post(self, request):
         serializer = LotSerializer(data=request.data)
 
         if serializer.is_valid():
             lot = serializer.save(agriculteur=request.user)
 
-            # =========================
-            # BLOCKCHAIN
-            # =========================
-            blockchain = BlockchainService()
-            tx_hash = blockchain.enregistrer_lot(
-                lot_id=str(lot.id),
-                hash_donnees=lot.calculer_hash()
-            )
-
-            lot.tx_hash = tx_hash if tx_hash else None
-            lot.blockchain_status = "confirmed" if tx_hash else "pending"
+            # ❌ IMPORTANT : PAS DE BLOCKCHAIN ICI
+            lot.blockchain_status = "pending"
             lot.save()
 
-            # =========================
-            # QR CODE LOT
-            # =========================
-            verify_url = f"https://mbh-chaincacao-back.onrender.com/api/lots/{lot.id}/verify/"
-
             qr_url = generer_qr_code(
-                verify_url,
+                f"https://mbh-chaincacao-back.onrender.com/api/lots/{lot.id}/verify/",
                 public_id=f"qr_lot_{lot.id}"
             )
 
-            # ✅ UNIQUE SOURCE OF TRUTH
             lot.qr_code_url = qr_url
             lot.save()
 
             return Response({
-                'lot': LotSerializer(lot).data,
-                'qr_code_url': qr_url,
-                'tx_hash': tx_hash,
-                'message': '✅ Lot enregistré sur la blockchain !'
-                if tx_hash else '✅ Lot créé (blockchain en attente)'
-            }, status=status.HTTP_201_CREATED)
+                "lot": LotSerializer(lot).data,
+                "qr_code_url": qr_url,
+                "message": "Lot créé"
+            }, 201)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, 400)
 
 
 # =========================
@@ -363,3 +332,46 @@ class CertificatEUDRView(APIView):
             "blockchain": blockchain_data,
             "message": "✅ Certificat généré"
         })
+
+
+class CertifierLotView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, lot_id):
+        try:
+            lot = Lot.objects.get(id=lot_id)
+        except Lot.DoesNotExist:
+            return Response({"error": "Lot introuvable"}, 404)
+
+        # =========================
+        # VERIFICATION STRICTE
+        # =========================
+        if not Transfert.objects.filter(
+            lot=lot,
+            destinataire=request.user
+        ).exists():
+            return Response({"error": "Accès refusé"}, 403)
+
+        poids = request.data.get("poids_verifie", lot.poids_kg)
+
+        blockchain = BlockchainService()
+        tx_hash = blockchain.enregistrer_transfert(
+            lot_id=str(lot.id),
+            etape="certification_cooperative",
+            user_id=request.user.id
+        )
+
+        # =========================
+        # FINAL STATE CORRECT
+        # =========================
+        lot.statut = "receptionne"   # 🔥 ICI LE VRAI MOMENT
+        lot.blockchain_status = "confirmed"
+        lot.tx_hash = tx_hash or ""
+        lot.save()
+
+        return Response({
+            "message": "Lot certifié avec succès",
+            "lot": LotSerializer(lot).data
+        })
+
+
