@@ -64,7 +64,7 @@ class ProfileView(APIView):
 # =========================
 
 class CooperativeListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         users = User.objects.filter(role='cooperative')
