@@ -16,11 +16,19 @@ class Lot(models.Model):
     ]
 
     STATUTS = [
-        ('cree',       'Créé'),
+        ('cree', 'Créé'),
         ('en_transit', 'En transit'),
-        ('certifie',   'Certifié'),
-        ('exporte',    'Exporté'),
+        ('receptionne', 'Réceptionné'),
+        ('certifie', 'Certifié'),
+        ('exporte', 'Exporté'),
     ]
+
+    # STATUTS = [
+    #     ('cree',       'Créé'),
+    #     ('en_transit', 'En transit'),
+    #     ('certifie',   'Certifié'),
+    #     ('exporte',    'Exporté'),
+    # ]
 
     # ID
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

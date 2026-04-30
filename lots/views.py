@@ -33,11 +33,17 @@ class LotListCreateView(APIView):
             lots = Lot.objects.filter(agriculteur=user)
 
         elif user.role == 'cooperative':
-            # 🔥 IMPORTANT : uniquement assignés MAIS NON certifiés
             lots = Lot.objects.filter(
                 transferts__destinataire=user,
-                statut__in=["envoye", "en_attente_validation"]
+                statut="en_transit"
             ).distinct()
+
+        # elif user.role == 'cooperative':
+        #     # 🔥 IMPORTANT : uniquement assignés MAIS NON certifiés
+        #     lots = Lot.objects.filter(
+        #         transferts__destinataire=user,
+        #         statut__in=["envoye", "en_attente_validation"]
+        #     ).distinct()
 
         # elif user.role == 'cooperative':
         #     lots = Lot.objects.filter(
@@ -108,12 +114,18 @@ class LotDetailView(APIView):
         # =========================
         # COOPERATIVE
         # =========================
-        if user.role == 'cooperative':
-            if not Transfert.objects.filter(
-                    lot=lot,
-                    destinataire=user
-            ).exists():
-                return Response({"error": "Accès refusé"}, 403)
+
+        last_transfer = Transfert.objects.filter(lot=lot).order_by("-date_transfert").first()
+
+        if not last_transfer or last_transfer.destinataire != user:
+            return Response({"error": "Accès refusé"}, 403)
+
+        # if user.role == 'cooperative':
+        #     if not Transfert.objects.filter(
+        #             lot=lot,
+        #             destinataire=user
+        #     ).exists():
+        #         return Response({"error": "Accès refusé"}, 403)
 
         return Response(LotSerializer(lot).data)
 
@@ -269,10 +281,15 @@ class ConfirmerReceptionView(APIView):
             transfert.tx_hash = tx_hash
             transfert.save()
 
+        # 🔥 CRITIQUE : UPDATE DU STATUT DU LOT
+        lot.statut = "receptionne"
+        lot.blockchain_status = "confirmed"
+        lot.save()
+
         return Response({
             'transfert': TransfertSerializer(transfert).data,
             'lot': LotSerializer(lot).data,
-            'message': '✅ Réception confirmée'
+            'message': 'Réception confirmée'
         })
 
 

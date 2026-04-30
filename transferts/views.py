@@ -64,8 +64,19 @@ class TransfertListCreateView(APIView):
             transfert.save()
 
             # ⚠️ IMPORTANT : NE PAS VALIDER LE LOT ICI
-            lot.statut = "envoye"
+            if etape == "ferme_cooperative":
+                lot.statut = "en_transit"
+
+            elif etape == "cooperative_transformateur":
+                lot.statut = "receptionne"
+
+            elif etape == "transformateur_exportateur":
+                lot.statut = "certifie"
+
             lot.save()
+
+            # lot.statut = "envoye"
+            # lot.save()
 
             return Response({
                 "transfert": TransfertSerializer(transfert).data,
@@ -73,3 +84,6 @@ class TransfertListCreateView(APIView):
             }, 201)
 
         return Response(serializer.errors, 400)
+
+
+
