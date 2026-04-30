@@ -11,23 +11,25 @@ class TransfertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transfert
         fields = [
-            'id',
-            'lot',
-            'expediteur', 'expediteur_detail',
-            'destinataire', 'destinataire_detail',
-            'etape',
-            'poids_verifie',
-            'notes',
-            'tx_hash',
-            'date_transfert'
+            "id",
+            "lot",
+            "expediteur",
+            "expediteur_detail",
+            "destinataire",
+            "destinataire_detail",
+            "etape",
+            "poids_verifie",
+            "notes",
+            "tx_hash",
+            "date_transfert",
         ]
 
         read_only_fields = [
-            'id',
-            'expediteur',   # 🔥 OBLIGATOIRE
-            'tx_hash',
-            'date_transfert',
-            'expediteur_detail',
-            'destinataire_detail'
+            "id",
+            "expediteur",
+            "tx_hash",
+            "date_transfert",
+            "expediteur_detail",
+            "destinataire_detail",
         ]
 

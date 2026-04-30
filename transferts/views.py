@@ -10,9 +10,16 @@ from blockchain.service import BlockchainService
 
 
 ETAPE_ROLE = {
-    'ferme_cooperative': 'agriculteur',
-    'cooperative_transformateur': 'cooperative',
-    'transformateur_exportateur': 'transformateur',
+    "ferme_cooperative": "agriculteur",
+    "cooperative_transformateur": "cooperative",
+    "transformateur_exportateur": "transformateur",
+}
+
+
+ETAPE_DESTINATAIRE = {
+    "ferme_cooperative": "cooperative",
+    "cooperative_transformateur": "transformateur",
+    "transformateur_exportateur": "exportateur",
 }
 
 
@@ -22,68 +29,71 @@ class TransfertListCreateView(APIView):
     def post(self, request):
         etape = request.data.get("etape")
         lot_id = request.data.get("lot")
+        poids = request.data.get("poids_verifie")
+        notes = request.data.get("notes", "")
 
+        # -------------------------
+        # VALIDATION BASE
+        # -------------------------
         try:
             lot = Lot.objects.get(id=lot_id)
         except Lot.DoesNotExist:
             return Response({"error": "Lot introuvable"}, 404)
 
-        role_requis = ETAPE_ROLE.get(etape)
-
-        if not role_requis:
+        if etape not in ETAPE_ROLE:
             return Response({"error": "Étape invalide"}, 400)
 
-        if request.user.role != role_requis:
-            return Response({"error": "Rôle invalide"}, 403)
+        if request.user.role != ETAPE_ROLE[etape]:
+            return Response({"error": "Rôle non autorisé"}, 403)
 
-        # =========================
-        # COOP VALIDATION STRICTE
-        # =========================
-        if request.user.role == "cooperative":
-            last = Transfert.objects.filter(lot=lot).order_by("-date_transfert").first()
+        # -------------------------
+        # DESTINATAIRE AUTO
+        # -------------------------
+        destinataire_role = ETAPE_DESTINATAIRE[etape]
+        destinataire = None
 
-            if not last or last.destinataire != request.user:
-                return Response(
-                    {"error": "Ce lot ne vous a pas été assigné"},
-                    403
-                )
+        if etape == "ferme_cooperative":
+            destinataire = None  # ou coop assignée si logique future
+        else:
+            from users.models import User
+            destinataire = User.objects.filter(role=destinataire_role).first()
 
-        serializer = TransfertSerializer(data=request.data)
+        # -------------------------
+        # SERIALIZER SAFE
+        # -------------------------
+        serializer = TransfertSerializer(data={
+            "lot": lot.id,
+            "etape": etape,
+            "poids_verifie": poids,
+            "notes": notes,
+            "destinataire": destinataire.id if destinataire else None,
+        })
 
-        if serializer.is_valid():
-            transfert = serializer.save(expediteur=request.user)
-
-            blockchain = BlockchainService()
-            tx_hash = blockchain.enregistrer_transfert(
-                lot_id=str(lot.id),
-                etape=etape,
-                user_id=request.user.id
-            )
-
-            transfert.tx_hash = tx_hash or ""
-            transfert.save()
-
-            # ⚠️ IMPORTANT : NE PAS VALIDER LE LOT ICI
-            if etape == "ferme_cooperative":
-                lot.statut = "en_transit"
-
-            elif etape == "cooperative_transformateur":
-                lot.statut = "receptionne"
-
-            elif etape == "transformateur_exportateur":
-                lot.statut = "certifie"
-
-            lot.save()
-
-            # lot.statut = "envoye"
-            # lot.save()
-
+        if not serializer.is_valid():
             return Response({
-                "transfert": TransfertSerializer(transfert).data,
-                "message": "Transfert enregistré"
-            }, 201)
+                "error": "Données invalides",
+                "details": serializer.errors
+            }, 400)
 
-        return Response(serializer.errors, 400)
+        transfert = serializer.save(expediteur=request.user)
+
+        # -------------------------
+        # BLOCKCHAIN
+        # -------------------------
+        blockchain = BlockchainService()
+        tx_hash = blockchain.enregistrer_transfert(
+            lot_id=str(lot.id),
+            etape=etape,
+            user_id=request.user.id
+        )
+
+        transfert.tx_hash = tx_hash or ""
+        transfert.save()
+
+        return Response({
+            "transfert": TransfertSerializer(transfert).data,
+            "message": "Transfert enregistré avec succès"
+        }, 201)
 
 
 
