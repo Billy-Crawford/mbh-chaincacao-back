@@ -12,7 +12,7 @@ from users.permissions import EstAgriculteur, EstCooperative, EstTransformateur
 
 # Mapping étape → rôle autorisé
 ETAPE_ROLE = {
-    'ferme_cooperative':          'agriculteur',
+    'ferme_cooperative':          'cooperative',
     'cooperative_transformateur': 'cooperative',
     'transformateur_exportateur': 'transformateur',
 }
@@ -69,3 +69,4 @@ class TransfertListCreateView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

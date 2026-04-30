@@ -25,3 +25,4 @@ class Transfert(models.Model):
 
     def __str__(self):
         return f"Transfert {self.lot.id} — {self.etape}"
+

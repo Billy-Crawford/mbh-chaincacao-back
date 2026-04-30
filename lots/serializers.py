@@ -1,3 +1,4 @@
+# lots/serializers.py
 from rest_framework import serializers
 from .models import Lot
 from users.serializers import UserSerializer
