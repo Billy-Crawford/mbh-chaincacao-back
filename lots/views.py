@@ -1,3 +1,4 @@
+# lots/views.py
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -30,8 +31,31 @@ class LotListCreateView(APIView):
         return [IsAuthenticated()]
 
     def get(self, request):
-        lots = Lot.objects.filter(agriculteur=request.user).order_by('-created_at')
+        user = request.user
+
+        # Si c'est un agriculteur, il voit ses propres productions
+        if hasattr(user, 'role') and user.role == 'agriculteur':
+            lots = Lot.objects.filter(agriculteur=user).order_by('-created_at')
+
+        # Si c'est une coopérative, elle doit voir les lots à réceptionner
+        # OU les lots déjà réceptionnés par elle
+        elif hasattr(user, 'role') and user.role == 'cooperative':
+            # Option A : La coop voit TOUS les lots créés qui n'ont pas encore de transfert vers une autre coop
+            lots = Lot.objects.all().order_by('-created_at')
+
+        # Si c'est un exportateur
+        elif hasattr(user, 'role') and user.role == 'exportateur':
+            lots = Lot.objects.filter(statut='en_transit').order_by('-created_at')
+
+        else:
+            # Par défaut, on retourne les lots liés à l'utilisateur
+            lots = Lot.objects.filter(agriculteur=user).order_by('-created_at')
+
         return Response(LotSerializer(lots, many=True).data)
+
+    # def get(self, request):
+    #     lots = Lot.objects.filter(agriculteur=request.user).order_by('-created_at')
+    #     return Response(LotSerializer(lots, many=True).data)
 
     def post(self, request):
         serializer = LotSerializer(data=request.data)
