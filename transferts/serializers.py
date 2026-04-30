@@ -1,3 +1,4 @@
+# transferts/serializers.py
 from rest_framework import serializers
 from .models import Transfert
 from users.serializers import UserSerializer
@@ -29,3 +30,4 @@ class TransfertSerializer(serializers.ModelSerializer):
             'expediteur_detail',
             'destinataire_detail'
         ]
+

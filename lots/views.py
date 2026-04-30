@@ -37,39 +37,35 @@ class LotListCreateView(APIView):
         # AGRICULTEUR
         # =========================
         if user.role == 'agriculteur':
-            lots = Lot.objects.filter(
-                agriculteur=user
-            ).order_by('-created_at')
+            lots = Lot.objects.filter(agriculteur=user)
 
         # =========================
-        # COOPERATIVE
+        # COOPERATIVE (UNIQUEMENT LOTS ATTRIBUÉS)
         # =========================
         elif user.role == 'cooperative':
+            lots = Lot.objects.filter(
+                transferts__destinataire=user
+            ).distinct()
 
-            # 🔹 lots reçus (ACTION POSSIBLE)
-            lots_recus_ids = Transfert.objects.filter(
-                destinataire=user
-            ).values_list('lot_id', flat=True)
-
-            lots_recus = Lot.objects.filter(id__in=lots_recus_ids)
-
-            # 🔹 autres lots (LECTURE SEULE)
-            autres_lots = Lot.objects.exclude(id__in=lots_recus_ids)
-
-            lots = (lots_recus | autres_lots).distinct().order_by('-created_at')
+        # =========================
+        # TRANSFORMATEUR
+        # =========================
+        elif user.role == 'transformateur':
+            lots = Lot.objects.filter(
+                transferts__destinataire=user
+            ).distinct()
 
         # =========================
         # EXPORTATEUR
         # =========================
         elif user.role == 'exportateur':
-            lots = Lot.objects.filter(
-                statut='en_transit'
-            ).order_by('-created_at')
+            lots = Lot.objects.filter(statut='en_transit')
 
         else:
             lots = Lot.objects.none()
 
         return Response(LotSerializer(lots, many=True).data)
+
 
     # def get(self, request):
     #     lots = Lot.objects.filter(agriculteur=request.user).order_by('-created_at')
@@ -129,24 +125,26 @@ class LotDetailView(APIView):
     def get(self, request, lot_id):
         try:
             lot = Lot.objects.get(id=lot_id)
-            user = request.user
+        except Lot.DoesNotExist:
+            return Response({"error": "Lot introuvable"}, 404)
 
-            # AGRICULTEUR
-            if user.role == 'agriculteur' and lot.agriculteur != user:
-                return Response({'error': 'Accès refusé'}, status=403)
+        user = request.user
 
-            # COOPERATIVE → doit avoir reçu le lot
-            if user.role == 'cooperative':
-                autorise = Transfert.objects.filter(
+        # =========================
+        # AGRICULTEUR
+        # =========================
+        if user.role == 'agriculteur' and lot.agriculteur != user:
+            return Response({"error": "Accès refusé"}, 403)
+
+        # =========================
+        # COOPERATIVE
+        # =========================
+        if user.role == 'cooperative':
+            if not Transfert.objects.filter(
                     lot=lot,
                     destinataire=user
-                ).exists()
-
-                if not autorise:
-                    return Response({'error': 'Accès refusé'}, status=403)
-
-        except Lot.DoesNotExist:
-            return Response({'error': 'Lot introuvable'}, status=404)
+            ).exists():
+                return Response({"error": "Accès refusé"}, 403)
 
         return Response(LotSerializer(lot).data)
 
