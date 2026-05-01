@@ -79,3 +79,5 @@ class Lot(models.Model):
 
     def __str__(self):
         return f"Lot {self.id} — {self.espece} {self.poids_kg}kg"
+
+
