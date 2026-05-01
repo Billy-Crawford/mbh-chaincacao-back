@@ -178,7 +178,7 @@ class ExporterLotView(APIView):
         except Lot.DoesNotExist:
             return Response({'error': 'Lot introuvable'}, status=404)
 
-        if lot.statut != 'en_transit':
+        if lot.statut != 'certifie':
             return Response({'error': 'Statut invalide'}, status=400)
 
         transfert = Transfert.objects.create(
