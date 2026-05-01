@@ -350,7 +350,6 @@ class ConfirmerReceptionView(APIView):
 # =========================
 # CERTIFICAT EUDR + CLOUDINARY
 # =========================
-
 class CertificatEUDRView(APIView):
     permission_classes = [AllowAny]
 
@@ -381,7 +380,8 @@ class CertificatEUDRView(APIView):
             resource_type="raw",
             folder="certificats_eudr",
             public_id=f"certificat_{lot.id}",
-            format="pdf"
+            format="pdf",
+            access_mode="public",  # ← CORRECTION
         )
 
         certificat_url = upload_result["secure_url"]
@@ -395,11 +395,6 @@ class CertificatEUDRView(APIView):
         lot.qr_code_url = qr_code
         lot.save()
 
-        # if hasattr(lot, "certificat_url"):
-        #     lot.certificat_url = certificat_url
-        #     lot.qr_code_url = qr_code
-        #     lot.save()
-
         return Response({
             "lot": LotSerializer(lot).data,
             "certificat_url": certificat_url,
@@ -407,6 +402,64 @@ class CertificatEUDRView(APIView):
             "blockchain": blockchain_data,
             "message": "✅ Certificat généré"
         })
+
+
+# class CertificatEUDRView(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request, lot_id):
+#         try:
+#             lot = Lot.objects.prefetch_related('transferts').get(id=lot_id)
+#         except Lot.DoesNotExist:
+#             return Response({'error': 'Lot introuvable'}, status=404)
+#
+#         blockchain = BlockchainService()
+#
+#         blockchain_data = {
+#             'enregistre_sur_bc': blockchain.lot_existe_blockchain(str(lot.id)),
+#             'tx_hash': lot.tx_hash or '',
+#         }
+#
+#         pdf_bytes = generer_certificat_eudr(
+#             lot,
+#             lot.transferts.all(),
+#             blockchain_data
+#         )
+#
+#         file_obj = io.BytesIO(pdf_bytes)
+#         file_obj.seek(0)
+#
+#         upload_result = cloudinary.uploader.upload(
+#             file_obj,
+#             resource_type="raw",
+#             folder="certificats_eudr",
+#             public_id=f"certificat_{lot.id}",
+#             format="pdf"
+#         )
+#
+#         certificat_url = upload_result["secure_url"]
+#
+#         qr_code = generer_qr_code(
+#             certificat_url,
+#             public_id=f"qr_certificat_{lot.id}"
+#         )
+#
+#         lot.certificat_url = certificat_url
+#         lot.qr_code_url = qr_code
+#         lot.save()
+#
+#         # if hasattr(lot, "certificat_url"):
+#         #     lot.certificat_url = certificat_url
+#         #     lot.qr_code_url = qr_code
+#         #     lot.save()
+#
+#         return Response({
+#             "lot": LotSerializer(lot).data,
+#             "certificat_url": certificat_url,
+#             "qr_code": qr_code,
+#             "blockchain": blockchain_data,
+#             "message": "✅ Certificat généré"
+#         })
 
 
 class CertifierLotView(APIView):
