@@ -1,3 +1,4 @@
+# transferts/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -49,18 +50,18 @@ class TransfertListCreateView(APIView):
                 "your_role": request.user.role
             }, status=403)
 
+        # =========================
+        # 🔥 FIX IMPORTANT : DESTINATAIRE OPTIONNEL
+        # =========================
         destinataire_role = ETAPE_DESTINATAIRE_ROLE.get(etape)
         destinataire = User.objects.filter(role=destinataire_role).first()
-
-        if not destinataire:
-            return Response({"error": "Destinataire introuvable"}, status=400)
 
         serializer = TransfertSerializer(data={
             "lot": lot.id,
             "etape": etape,
             "poids_verifie": request.data.get("poids_verifie"),
             "notes": request.data.get("notes", ""),
-            "destinataire": destinataire.id,
+            "destinataire": destinataire.id if destinataire else None,
         })
 
         if not serializer.is_valid():
@@ -71,17 +72,23 @@ class TransfertListCreateView(APIView):
 
         transfert = serializer.save(expediteur=request.user)
 
-        # 🔥 IMPORTANT FIX : UPDATE DU LOT
+        # =========================
+        # 🔥 LOGIQUE LOT SAFE
+        # =========================
         if etape == "ferme_cooperative":
             lot.statut = "en_transit"
+
         elif etape == "cooperative_transformateur":
-            lot.statut = "en_transit"
+            lot.statut = "receptionne"  # 🔥 IMPORTANT FIX
+
         elif etape == "transformateur_exportateur":
             lot.statut = "certifie"
 
         lot.save()
 
-        # blockchain safe
+        # =========================
+        # BLOCKCHAIN SAFE
+        # =========================
         try:
             blockchain = BlockchainService()
             tx_hash = blockchain.enregistrer_transfert(
@@ -101,4 +108,6 @@ class TransfertListCreateView(APIView):
             "transfert": TransfertSerializer(transfert).data,
             "message": "Transfert OK"
         }, status=201)
+
+
 
