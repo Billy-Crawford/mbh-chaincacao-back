@@ -27,3 +27,5 @@ class RegisterSerializer(serializers.ModelSerializer):
             region   = validated_data.get('region', ''),
         )
         return user
+
+

@@ -32,22 +32,19 @@ class TransfertListCreateView(APIView):
         etape = request.data.get("etape")
         lot_id = request.data.get("lot")
 
-        # =========================
-        # VALIDATION LOT
-        # =========================
+        # 1. LOT
         try:
             lot = Lot.objects.get(id=lot_id)
         except Lot.DoesNotExist:
             return Response({"error": "Lot introuvable"}, status=404)
 
-        # =========================
-        # VALIDATION ETAPE
-        # =========================
+        # 2. ETAPE VALID
         if etape not in ETAPE_ROLE:
             return Response({"error": "Étape invalide"}, status=400)
 
         role_requis = ETAPE_ROLE[etape]
 
+        # 3. ROLE CHECK
         if request.user.role != role_requis:
             return Response({
                 "error": "Rôle non autorisé",
@@ -55,36 +52,25 @@ class TransfertListCreateView(APIView):
                 "your_role": request.user.role
             }, status=403)
 
-        # =========================
-        # DESTINATAIRE ROBUSTE
-        # =========================
+        # 4. DESTINATAIRE SAFE
         destinataire_role = ETAPE_DESTINATAIRE_ROLE.get(etape)
 
-        destinataire = (
-            User.objects
-            .filter(role=destinataire_role)
-            .order_by("id")
-            .first()
-        )
+        destinataire = User.objects.filter(role=destinataire_role).first()
 
-        if not destinataire:
+        if destinataire is None:
             return Response({
-                "error": "Aucun utilisateur disponible pour le rôle destinataire",
+                "error": "Aucun utilisateur destinataire trouvé",
                 "role": destinataire_role
             }, status=400)
 
-        # =========================
-        # PAYLOAD CLEAN
-        # =========================
-        payload = {
+        # 5. SERIALIZER SAFE
+        serializer = TransfertSerializer(data={
             "lot": lot.id,
             "etape": etape,
             "poids_verifie": request.data.get("poids_verifie"),
             "notes": request.data.get("notes", ""),
             "destinataire": destinataire.id,
-        }
-
-        serializer = TransfertSerializer(data=payload)
+        })
 
         if not serializer.is_valid():
             return Response({
@@ -94,22 +80,24 @@ class TransfertListCreateView(APIView):
 
         transfert = serializer.save(expediteur=request.user)
 
-        # =========================
-        # BLOCKCHAIN
-        # =========================
-        blockchain = BlockchainService()
-        tx_hash = blockchain.enregistrer_transfert(
-            lot_id=str(lot.id),
-            etape=etape,
-            user_id=request.user.id
-        )
+        # 6. BLOCKCHAIN SAFE (NE FAIT PAS FAIL REQUEST)
+        try:
+            blockchain = BlockchainService()
+            tx_hash = blockchain.enregistrer_transfert(
+                lot_id=str(lot.id),
+                etape=etape,
+                user_id=request.user.id
+            )
 
-        if tx_hash:
-            transfert.tx_hash = tx_hash
-            transfert.save()
+            if tx_hash:
+                transfert.tx_hash = tx_hash
+                transfert.save()
+
+        except Exception as e:
+            print("BLOCKCHAIN ERROR:", e)
 
         return Response({
             "transfert": TransfertSerializer(transfert).data,
-            "message": "Transfert enregistré avec succès"
+            "message": "Transfert enregistré"
         }, status=201)
 
