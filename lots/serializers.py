@@ -65,7 +65,6 @@ class LotSerializer(serializers.ModelSerializer):
             Transfert.objects
             .filter(lot=obj)
             .order_by("date_transfert")
-            .distinct("etape")
         )
 
         return [
