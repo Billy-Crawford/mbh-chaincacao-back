@@ -32,19 +32,16 @@ class TransfertListCreateView(APIView):
         etape = request.data.get("etape")
         lot_id = request.data.get("lot")
 
-        # 1. LOT
         try:
             lot = Lot.objects.get(id=lot_id)
         except Lot.DoesNotExist:
             return Response({"error": "Lot introuvable"}, status=404)
 
-        # 2. ETAPE VALID
         if etape not in ETAPE_ROLE:
             return Response({"error": "Étape invalide"}, status=400)
 
         role_requis = ETAPE_ROLE[etape]
 
-        # 3. ROLE CHECK
         if request.user.role != role_requis:
             return Response({
                 "error": "Rôle non autorisé",
@@ -52,18 +49,12 @@ class TransfertListCreateView(APIView):
                 "your_role": request.user.role
             }, status=403)
 
-        # 4. DESTINATAIRE SAFE
         destinataire_role = ETAPE_DESTINATAIRE_ROLE.get(etape)
-
         destinataire = User.objects.filter(role=destinataire_role).first()
 
-        if destinataire is None:
-            return Response({
-                "error": "Aucun utilisateur destinataire trouvé",
-                "role": destinataire_role
-            }, status=400)
+        if not destinataire:
+            return Response({"error": "Destinataire introuvable"}, status=400)
 
-        # 5. SERIALIZER SAFE
         serializer = TransfertSerializer(data={
             "lot": lot.id,
             "etape": etape,
@@ -80,7 +71,17 @@ class TransfertListCreateView(APIView):
 
         transfert = serializer.save(expediteur=request.user)
 
-        # 6. BLOCKCHAIN SAFE (NE FAIT PAS FAIL REQUEST)
+        # 🔥 IMPORTANT FIX : UPDATE DU LOT
+        if etape == "ferme_cooperative":
+            lot.statut = "en_transit"
+        elif etape == "cooperative_transformateur":
+            lot.statut = "en_transit"
+        elif etape == "transformateur_exportateur":
+            lot.statut = "certifie"
+
+        lot.save()
+
+        # blockchain safe
         try:
             blockchain = BlockchainService()
             tx_hash = blockchain.enregistrer_transfert(
@@ -98,6 +99,6 @@ class TransfertListCreateView(APIView):
 
         return Response({
             "transfert": TransfertSerializer(transfert).data,
-            "message": "Transfert enregistré"
+            "message": "Transfert OK"
         }, status=201)
 

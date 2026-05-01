@@ -22,7 +22,6 @@ import cloudinary.uploader
 # LOT CREATE + LIST
 # =========================
 
-# lots/views.py
 class LotListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -32,11 +31,11 @@ class LotListCreateView(APIView):
         if user.role == 'agriculteur':
             lots = Lot.objects.filter(agriculteur=user)
 
+
         elif user.role == 'cooperative':
             lots = Lot.objects.filter(
-                transferts__destinataire=user,
-                statut="en_transit"
-            ).distinct()
+                transferts__destinataire=user
+            ).exclude(statut="cree").distinct()
 
         # elif user.role == 'cooperative':
         #     # 🔥 IMPORTANT : uniquement assignés MAIS NON certifiés
