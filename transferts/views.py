@@ -64,7 +64,8 @@ class TransfertListCreateView(APIView):
         STATUT_REQUIS = {
             "ferme_cooperative": "cree",
             "cooperative_transformateur": "receptionne",
-            "transformateur_exportateur": "certifie",
+            "transformateur_exportateur": "receptionne",
+            # "transformateur_exportateur": "certifie",
         }
 
         statut_requis = STATUT_REQUIS.get(etape)
