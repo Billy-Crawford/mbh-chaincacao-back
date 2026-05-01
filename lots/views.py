@@ -60,16 +60,6 @@ class LotListCreateView(APIView):
                 statut__in=['certifie', 'exporte']
             ).distinct()
 
-        # elif user.role == 'exportateur':
-        #
-        #     lots = Lot.objects.filter(
-        #
-        #         transferts__destinataire=user,
-        #
-        #         statut='certifie'
-        #
-        #     ).distinct()
-
         else:
             lots = Lot.objects.none()
 
@@ -173,7 +163,6 @@ class VerifierLotView(APIView):
 # =========================
 # EXPORT LOT
 # =========================
-
 class ExporterLotView(APIView):
     permission_classes = [EstExportateur]
 
@@ -206,15 +195,66 @@ class ExporterLotView(APIView):
             transfert.tx_hash = tx_hash
             transfert.save()
 
+        # ================================
+        # SAUVEGARDE tx_hash + certificat_url sur le lot
+        # ================================
+        certificat_url = f"https://mbh-chaincacao-back.onrender.com/api/lots/{lot_id}/verify/"
+
         lot.statut = 'exporte'
+        lot.tx_hash = tx_hash or ""
+        lot.certificat_url = certificat_url
+        lot.blockchain_status = "confirmed"
         lot.save()
 
         return Response({
             'transfert': TransfertSerializer(transfert).data,
             'lot': LotSerializer(lot).data,
-            'certificat_eudr': f'https://mbh-chaincacao-back.onrender.com/api/lots/{lot_id}/verify/',
+            'certificat_eudr': certificat_url,
             'message': '🚢 Lot exporté'
         })
+
+
+# class ExporterLotView(APIView):
+#     permission_classes = [EstExportateur]
+#
+#     def post(self, request, lot_id):
+#         try:
+#             lot = Lot.objects.get(id=lot_id)
+#         except Lot.DoesNotExist:
+#             return Response({'error': 'Lot introuvable'}, status=404)
+#
+#         if lot.statut != 'certifie':
+#             return Response({'error': 'Statut invalide'}, status=400)
+#
+#         transfert = Transfert.objects.create(
+#             lot=lot,
+#             expediteur=request.user,
+#             destinataire=request.user,
+#             etape='exportateur_europe',
+#             poids_verifie=request.data.get('poids_verifie', lot.poids_kg),
+#             notes=request.data.get('notes', '')
+#         )
+#
+#         blockchain = BlockchainService()
+#         tx_hash = blockchain.enregistrer_transfert(
+#             lot_id=str(lot.id),
+#             etape='exportateur_europe',
+#             user_id=request.user.id
+#         )
+#
+#         if tx_hash:
+#             transfert.tx_hash = tx_hash
+#             transfert.save()
+#
+#         lot.statut = 'exporte'
+#         lot.save()
+#
+#         return Response({
+#             'transfert': TransfertSerializer(transfert).data,
+#             'lot': LotSerializer(lot).data,
+#             'certificat_eudr': f'https://mbh-chaincacao-back.onrender.com/api/lots/{lot_id}/verify/',
+#             'message': '🚢 Lot exporté'
+#         })
 
 
 # =========================
