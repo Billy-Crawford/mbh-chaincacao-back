@@ -1,4 +1,3 @@
-# transferts/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,17 +5,20 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Transfert
 from .serializers import TransfertSerializer
 from lots.models import Lot
+from users.models import User
 from blockchain.service import BlockchainService
 
 
+# =========================
+# CONFIG METIER
+# =========================
 ETAPE_ROLE = {
     "ferme_cooperative": "agriculteur",
     "cooperative_transformateur": "cooperative",
     "transformateur_exportateur": "transformateur",
 }
 
-
-ETAPE_DESTINATAIRE = {
+ETAPE_DESTINATAIRE_ROLE = {
     "ferme_cooperative": "cooperative",
     "cooperative_transformateur": "transformateur",
     "transformateur_exportateur": "exportateur",
@@ -29,57 +31,72 @@ class TransfertListCreateView(APIView):
     def post(self, request):
         etape = request.data.get("etape")
         lot_id = request.data.get("lot")
-        poids = request.data.get("poids_verifie")
-        notes = request.data.get("notes", "")
 
-        # -------------------------
-        # VALIDATION BASE
-        # -------------------------
+        # =========================
+        # VALIDATION LOT
+        # =========================
         try:
             lot = Lot.objects.get(id=lot_id)
         except Lot.DoesNotExist:
-            return Response({"error": "Lot introuvable"}, 404)
+            return Response({"error": "Lot introuvable"}, status=404)
 
+        # =========================
+        # VALIDATION ETAPE
+        # =========================
         if etape not in ETAPE_ROLE:
-            return Response({"error": "Étape invalide"}, 400)
+            return Response({"error": "Étape invalide"}, status=400)
 
-        if request.user.role != ETAPE_ROLE[etape]:
-            return Response({"error": "Rôle non autorisé"}, 403)
+        role_requis = ETAPE_ROLE[etape]
 
-        # -------------------------
-        # DESTINATAIRE AUTO
-        # -------------------------
-        destinataire_role = ETAPE_DESTINATAIRE[etape]
-        destinataire = None
+        if request.user.role != role_requis:
+            return Response({
+                "error": "Rôle non autorisé",
+                "required": role_requis,
+                "your_role": request.user.role
+            }, status=403)
 
-        if etape == "ferme_cooperative":
-            destinataire = None  # ou coop assignée si logique future
-        else:
-            from users.models import User
-            destinataire = User.objects.filter(role=destinataire_role).first()
+        # =========================
+        # DESTINATAIRE ROBUSTE
+        # =========================
+        destinataire_role = ETAPE_DESTINATAIRE_ROLE.get(etape)
 
-        # -------------------------
-        # SERIALIZER SAFE
-        # -------------------------
-        serializer = TransfertSerializer(data={
+        destinataire = (
+            User.objects
+            .filter(role=destinataire_role)
+            .order_by("id")
+            .first()
+        )
+
+        if not destinataire:
+            return Response({
+                "error": "Aucun utilisateur disponible pour le rôle destinataire",
+                "role": destinataire_role
+            }, status=400)
+
+        # =========================
+        # PAYLOAD CLEAN
+        # =========================
+        payload = {
             "lot": lot.id,
             "etape": etape,
-            "poids_verifie": poids,
-            "notes": notes,
-            "destinataire": destinataire.id if destinataire else None,
-        })
+            "poids_verifie": request.data.get("poids_verifie"),
+            "notes": request.data.get("notes", ""),
+            "destinataire": destinataire.id,
+        }
+
+        serializer = TransfertSerializer(data=payload)
 
         if not serializer.is_valid():
             return Response({
                 "error": "Données invalides",
                 "details": serializer.errors
-            }, 400)
+            }, status=400)
 
         transfert = serializer.save(expediteur=request.user)
 
-        # -------------------------
+        # =========================
         # BLOCKCHAIN
-        # -------------------------
+        # =========================
         blockchain = BlockchainService()
         tx_hash = blockchain.enregistrer_transfert(
             lot_id=str(lot.id),
@@ -87,13 +104,12 @@ class TransfertListCreateView(APIView):
             user_id=request.user.id
         )
 
-        transfert.tx_hash = tx_hash or ""
-        transfert.save()
+        if tx_hash:
+            transfert.tx_hash = tx_hash
+            transfert.save()
 
         return Response({
             "transfert": TransfertSerializer(transfert).data,
             "message": "Transfert enregistré avec succès"
-        }, 201)
-
-
+        }, status=201)
 
