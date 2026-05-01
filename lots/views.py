@@ -54,16 +54,21 @@ class LotListCreateView(APIView):
                 transferts__destinataire=user
             ).distinct()
 
-
         elif user.role == 'exportateur':
-
             lots = Lot.objects.filter(
-
                 transferts__destinataire=user,
-
-                statut='certifie'
-
+                statut__in=['certifie', 'exporte']
             ).distinct()
+
+        # elif user.role == 'exportateur':
+        #
+        #     lots = Lot.objects.filter(
+        #
+        #         transferts__destinataire=user,
+        #
+        #         statut='certifie'
+        #
+        #     ).distinct()
 
         else:
             lots = Lot.objects.none()
