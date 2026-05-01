@@ -13,6 +13,8 @@ from transferts.models import Transfert
 from blockchain.service import BlockchainService
 from users.permissions import EstAgriculteur, EstExportateur
 
+from verification.pdf_generator import generer_certificat_eudr
+
 import qrcode
 import io
 import cloudinary.uploader
@@ -389,10 +391,14 @@ class CertificatEUDRView(APIView):
             public_id=f"qr_certificat_{lot.id}"
         )
 
-        if hasattr(lot, "certificat_url"):
-            lot.certificat_url = certificat_url
-            lot.qr_code_url = qr_code
-            lot.save()
+        lot.certificat_url = certificat_url
+        lot.qr_code_url = qr_code
+        lot.save()
+
+        # if hasattr(lot, "certificat_url"):
+        #     lot.certificat_url = certificat_url
+        #     lot.qr_code_url = qr_code
+        #     lot.save()
 
         return Response({
             "lot": LotSerializer(lot).data,
