@@ -1,9 +1,5 @@
 # lots/serializers.py
 
-# from rest_framework import serializers
-# from .models import Lot
-# from users.serializers import UserSerializer
-
 from rest_framework import serializers
 from .models import Lot
 from users.serializers import UserSerializer
@@ -13,11 +9,9 @@ from transferts.models import Transfert
 class LotSerializer(serializers.ModelSerializer):
     agriculteur_detail = UserSerializer(source='agriculteur', read_only=True)
 
-    # 🔥 NOUVEAUX CHAMPS
     poids_verifie = serializers.SerializerMethodField()
     date_reception = serializers.SerializerMethodField()
     historique = serializers.SerializerMethodField()
-
     hash_donnees = serializers.SerializerMethodField()
 
     class Meta:
@@ -35,7 +29,6 @@ class LotSerializer(serializers.ModelSerializer):
             'notes',
             'statut',
 
-            # 🔥 NEW
             'poids_verifie',
             'date_reception',
             'historique',
@@ -51,33 +44,42 @@ class LotSerializer(serializers.ModelSerializer):
         ]
 
     # =========================
-    # 🔥 LOGIQUE MÉTIER
+    # DERNIER TRANSFERT
     # =========================
+    def _last_transfer(self, obj):
+        return Transfert.objects.filter(lot=obj).order_by("-date_transfert").first()
 
     def get_poids_verifie(self, obj):
-        last = Transfert.objects.filter(lot=obj).order_by("-date_transfert").first()
-        return last.poids_verifie if last else None
+        last = self._last_transfer(obj)
+        return last.poids_verifie if last else obj.poids_kg
 
     def get_date_reception(self, obj):
-        last = Transfert.objects.filter(lot=obj).order_by("-date_transfert").first()
+        last = self._last_transfer(obj)
         return last.date_transfert if last else None
 
+    # =========================
+    # HISTORIQUE CLEAN (ANTI DOUBLON)
+    # =========================
     def get_historique(self, obj):
-        transferts = Transfert.objects.filter(lot=obj).order_by("date_transfert")
+        transferts = (
+            Transfert.objects
+            .filter(lot=obj)
+            .order_by("date_transfert")
+            .distinct("etape")
+        )
 
         return [
             {
                 "etape": t.etape,
                 "date": t.date_transfert,
                 "poids": t.poids_verifie,
-                "tx_hash": t.tx_hash,
+                "tx_hash": t.tx_hash or "—",
             }
             for t in transferts
         ]
 
     def get_hash_donnees(self, obj):
         return obj.calculer_hash()
-
 
 
 

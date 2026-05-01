@@ -51,8 +51,13 @@ class TransfertListCreateView(APIView):
             }, status=403)
 
         # =========================
-        # 🔥 FIX IMPORTANT : DESTINATAIRE OPTIONNEL
+        # 🔥 ANTI-DOUBLON GLOBAL
         # =========================
+        if Transfert.objects.filter(lot=lot, etape=etape).exists():
+            return Response({
+                "error": "Transfert déjà effectué pour cette étape"
+            }, status=400)
+
         destinataire_role = ETAPE_DESTINATAIRE_ROLE.get(etape)
         destinataire = User.objects.filter(role=destinataire_role).first()
 
@@ -73,13 +78,13 @@ class TransfertListCreateView(APIView):
         transfert = serializer.save(expediteur=request.user)
 
         # =========================
-        # 🔥 LOGIQUE LOT SAFE
+        # LOGIQUE LOT
         # =========================
         if etape == "ferme_cooperative":
             lot.statut = "en_transit"
 
         elif etape == "cooperative_transformateur":
-            lot.statut = "receptionne"  # 🔥 IMPORTANT FIX
+            lot.statut = "receptionne"
 
         elif etape == "transformateur_exportateur":
             lot.statut = "certifie"
@@ -103,11 +108,10 @@ class TransfertListCreateView(APIView):
 
         except Exception as e:
             print("BLOCKCHAIN ERROR:", e)
+            # ⚠️ on ne bloque PAS le système
 
         return Response({
             "transfert": TransfertSerializer(transfert).data,
             "message": "Transfert OK"
         }, status=201)
-
-
 
