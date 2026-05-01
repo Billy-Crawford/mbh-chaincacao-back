@@ -13,4 +13,5 @@ web3
 eth-account
 pillow
 qrcode
+reportlab
 
