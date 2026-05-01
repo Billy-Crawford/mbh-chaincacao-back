@@ -14,7 +14,7 @@ class Transfert(models.Model):
 
     lot            = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name='transferts')
     expediteur     = models.ForeignKey(User, on_delete=models.PROTECT, related_name='envois')
-    destinataire   = models.ForeignKey(User, on_delete=models.PROTECT, related_name='receptions')
+    destinataire   = models.ForeignKey(User, on_delete=models.PROTECT, related_name='receptions', null=True, blank=True)
     etape          = models.CharField(max_length=40, choices=ETAPES)
     poids_verifie  = models.FloatField()
     notes          = models.TextField(blank=True)
