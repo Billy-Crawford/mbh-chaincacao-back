@@ -81,3 +81,14 @@ class TransformateurListView(APIView):
         users = User.objects.filter(role='transformateur')
         return Response(UserSerializer(users, many=True).data)
 
+# =========================
+# LISTE EXPORTATEURS
+# =========================
+class ExportateurListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        users = User.objects.filter(role='exportateur')
+        return Response(UserSerializer(users, many=True).data)
+
+

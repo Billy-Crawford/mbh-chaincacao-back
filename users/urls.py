@@ -1,6 +1,6 @@
 # users/urls.py
 from django.urls import path
-from .views import RegisterView, LoginView, ProfileView, CooperativeListView, TransformateurListView
+from .views import RegisterView, LoginView, ProfileView, CooperativeListView, TransformateurListView, ExportateurListView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
@@ -10,6 +10,7 @@ urlpatterns = [
     path('refresh/',  TokenRefreshView.as_view(), name='token_refresh'),
     path('cooperatives/', CooperativeListView.as_view()),
     path('transformateurs/', TransformateurListView.as_view()),
+    path('exportateurs/', ExportateurListView.as_view()),
 
 ]
 
