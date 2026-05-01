@@ -59,6 +59,21 @@ class TransfertListCreateView(APIView):
             }, status=400)
 
         # =========================
+        # VÉRIFICATION STATUT PRÉ-REQUIS
+        # =========================
+        STATUT_REQUIS = {
+            "ferme_cooperative": "cree",
+            "cooperative_transformateur": "receptionne",
+            "transformateur_exportateur": "certifie",
+        }
+
+        statut_requis = STATUT_REQUIS.get(etape)
+        if statut_requis and lot.statut != statut_requis:
+            return Response({
+                "error": f"Le lot doit être '{statut_requis}' avant cette étape. Statut actuel : '{lot.statut}'"
+            }, status=400)
+
+        # =========================
         # DESTINATAIRE — priorité au choix frontend
         # =========================
         destinataire_id = request.data.get("destinataire")
