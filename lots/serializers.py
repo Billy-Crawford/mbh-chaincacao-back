@@ -7,7 +7,13 @@ from transferts.models import Transfert
 
 
 class LotSerializer(serializers.ModelSerializer):
+
     agriculteur_detail = UserSerializer(source='agriculteur', read_only=True)
+
+    poids_verifie = serializers.SerializerMethodField()
+    date_reception = serializers.SerializerMethodField()
+    historique = serializers.SerializerMethodField()
+    hash_donnees = serializers.SerializerMethodField()
 
     class Meta:
         model = Lot
@@ -15,6 +21,7 @@ class LotSerializer(serializers.ModelSerializer):
             'id',
             'agriculteur',
             'agriculteur_detail',
+
             'espece',
             'poids_kg',
             'gps_latitude',
@@ -22,18 +29,48 @@ class LotSerializer(serializers.ModelSerializer):
             'date_recolte',
             'notes',
             'statut',
+
             'poids_verifie',
             'date_reception',
             'historique',
+            'hash_donnees',
+
             'tx_hash',
             'blockchain_status',
             'qr_code_url',
             'certificat_url',
-            'hash_donnees',
             'created_at',
         ]
-        read_only_fields = ['agriculteur']  # 🔥 FIX CRITIQUE
 
+        read_only_fields = ['agriculteur']
+
+    # =========================
+    # METHODS (DOIVENT ÊTRE ICI)
+    # =========================
+
+    def get_poids_verifie(self, obj):
+        last = Transfert.objects.filter(lot=obj).order_by("-date_transfert").first()
+        return last.poids_verifie if last else obj.poids_kg
+
+    def get_date_reception(self, obj):
+        last = Transfert.objects.filter(lot=obj).order_by("-date_transfert").first()
+        return last.date_transfert if last else None
+
+    def get_historique(self, obj):
+        transferts = Transfert.objects.filter(lot=obj).order_by("date_transfert")
+
+        return [
+            {
+                "etape": t.etape,
+                "date": t.date_transfert,
+                "poids": t.poids_verifie,
+                "tx_hash": t.tx_hash or "—",
+            }
+            for t in transferts
+        ]
+
+    def get_hash_donnees(self, obj):
+        return obj.calculer_hash()
 
 
 
